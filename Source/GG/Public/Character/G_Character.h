@@ -6,6 +6,7 @@
 #include "GameFramework/Character.h"
 #include "G_Character.generated.h"
 
+class UComp_Inventory;
 class UAS_Player;
 class UGameplayEffect;
 class UGameplayAbility;

@@ -13,15 +13,20 @@ AG_PlayerController::AG_PlayerController()
 {
 	bReplicates = true;
 	PrimaryActorTick.bCanEverTick = true;
-
-	// 创建交互组件
-	InteractionComp = CreateDefaultSubobject<UComp_Interaction>(TEXT("InteractionComp"));
+	
 }
 
 void AG_PlayerController::BeginPlay()
 {
 	Super::BeginPlay();
 	check(IMC);
+	
+	// 查找蓝图中添加的组件
+	InteractionComp = FindComponentByClass<UComp_Interaction>();
+	if (!InteractionComp)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("未找到 InteractionComp，请确认是否在蓝图中添加了该组件！"));
+	}
 	
 	UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetLocalPlayer());
 	if (Subsystem)
@@ -60,6 +65,9 @@ void AG_PlayerController::SetupInputComponent()
 	EnhancedInputComponent->BindAction(AttackAction, ETriggerEvent::Started, this, &AG_PlayerController::AttackInput);
 	EnhancedInputComponent->BindAction(ToggleViewAction, ETriggerEvent::Started, this, &AG_PlayerController::ToggleViewMode);
 	EnhancedInputComponent->BindAction(LeftClickAction, ETriggerEvent::Started, this, &AG_PlayerController::OnLeftClick);
+	EnhancedInputComponent->BindAction(OpenInventoryAction, ETriggerEvent::Started, this, &AG_PlayerController::OpenInventory);
+	
+	
 }
 
 void AG_PlayerController::MoveInput(const FInputActionValue& InputActionValue)
@@ -174,4 +182,9 @@ void AG_PlayerController::OnLeftClick()
 	{
 		InteractionComp->TryInteract();
 	}
+}
+
+void AG_PlayerController::OpenInventory_Implementation()
+{
+	
 }

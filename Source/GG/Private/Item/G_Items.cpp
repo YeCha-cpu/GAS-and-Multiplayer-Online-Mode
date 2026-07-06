@@ -6,6 +6,10 @@
 AG_Items::AG_Items()
 {
 	PrimaryActorTick.bCanEverTick = true;
+	
+	// 开启网络复制
+	SetNetUpdateFrequency(100.f);
+	bReplicates = true;
 
 	ItemMesh = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("ItemMesh"));
 	SetRootComponent(ItemMesh);

@@ -31,6 +31,10 @@ protected:
 	virtual void BeginPlay() override;
 	virtual void SetupInputComponent() override;
 	
+	// 是否已打开背包
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "G|Inventory", DisplayName = "是否已打开背包")
+	bool bIsOpenInventory = false;
+	
 private:
 	/* ------------------------------ IMC ------------------------------ */
 	UPROPERTY(EditAnywhere, Category = "G|Input")
@@ -66,6 +70,9 @@ private:
 
 	UPROPERTY(EditAnywhere, Category = "G|Input")
 	TObjectPtr<UInputAction> LeftClickAction;      // 鼠标左键点击（俯视角下交互）
+	
+	UPROPERTY(EditAnywhere, Category = "G|Input")
+	TObjectPtr<UInputAction> OpenInventoryAction;  // Tab打开背包
 
 	/* ------------------------------ 输入回调函数 ------------------------------ */
 	void MoveInput(const FInputActionValue& InputActionValue);
@@ -77,7 +84,10 @@ private:
 	void AttackInput();
 	void ToggleViewMode();                         // 切换视角模式
 	void OnLeftClick();                            // 鼠标左键点击（执行射线检测）
-
+protected:
+	UFUNCTION(BlueprintNativeEvent, Category = "Inventory", DisplayName = "打开/关闭背包")
+	void OpenInventory();							// 打开背包
+private:
 	/* ------------------------------ 状态变量 ------------------------------ */
 	bool bFreeLook = true;                        // true=自由视角, false=俯视角锁定
 

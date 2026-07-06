@@ -59,4 +59,8 @@ protected:
 	// 拾取成功时调用的蓝图事件（可在蓝图中重载实现放入背包逻辑）
 	UFUNCTION(BlueprintImplementableEvent, Category = "Interaction")
 	void OnItemPickedUp(AG_Items* PickedItem);
+
+	// 服务器 RPC：用于在服务器上销毁物品
+	UFUNCTION(Server, Reliable, WithValidation)
+	void ServerDestroyItem(AG_Items* Item);
 };

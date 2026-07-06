@@ -1,10 +1,13 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 #include "Component/Comp_Interaction.h"
+
+#include "Component/Comp_Inventory.h"
 #include "Item/G_Items.h"
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/Pawn.h"
 #include "Engine/World.h"
+#include "Net/UnrealNetwork.h"
 
 UComp_Interaction::UComp_Interaction()
 {
@@ -25,7 +28,6 @@ void UComp_Interaction::UpdateInteraction()
 	bool bValid = false;
 	if (HitItem && HitItem->GetItemData().bCanInteract)
 	{
-		// 获取控制器和角色
 		APlayerController* OwnerPC = Cast<APlayerController>(GetOwner());
 		if (OwnerPC)
 		{
@@ -38,7 +40,6 @@ void UComp_Interaction::UpdateInteraction()
 					bValid = true;
 				}
 			}
-			// 如果无法获取角色，则 bValid 保持 false，不进行高亮
 		}
 	}
 
@@ -63,7 +64,6 @@ void UComp_Interaction::TryInteract()
 	if (!CurrentInteractable)
 		return;
 
-	// 获取控制器，并确保能获取到角色
 	APlayerController* OwnerPC = Cast<APlayerController>(GetOwner());
 	if (!OwnerPC)
 	{
@@ -78,7 +78,6 @@ void UComp_Interaction::TryInteract()
 		return;
 	}
 
-	// 距离检查
 	float Distance = FVector::Dist(ControlledPawn->GetActorLocation(), CurrentInteractable->GetActorLocation());
 	if (Distance > InteractionRange)
 	{
@@ -86,16 +85,12 @@ void UComp_Interaction::TryInteract()
 		return;
 	}
 
-	// 检查是否可拾取
 	if (CurrentInteractable->GetItemData().bCanPickUp)
 	{
-		OnItemPickedUp(CurrentInteractable);
+		OnItemPickedUp(CurrentInteractable);// 在蓝图实现
 		ClearHighlight();
-		if (CurrentInteractable)
-		{
-			CurrentInteractable->Destroy();
-			CurrentInteractable = nullptr;
-		}
+		ServerDestroyItem(CurrentInteractable);
+		CurrentInteractable = nullptr;
 	}
 	else
 	{
@@ -134,5 +129,47 @@ void UComp_Interaction::ApplyHighlight(AG_Items* Item)
 	{
 		Item->SetHighlightMaterial(HighlightMaterial);
 		LastInteractable = Item;
+	}
+}
+
+// ---------- 服务器 RPC 实现 ----------
+
+// 验证函数，确保调用者有权限执行 RPC
+bool UComp_Interaction::ServerDestroyItem_Validate(AG_Items* Item)
+{
+	return IsValid(Item);
+}
+// RPC 实现，执行物品销毁
+void UComp_Interaction::ServerDestroyItem_Implementation(AG_Items* Item)
+{
+	AActor* OwnerActor = GetOwner();
+	if (OwnerActor && OwnerActor->HasAuthority() && IsValid(Item))
+	{
+		// 获取物品数据
+		FItemData ItemData = Item->GetItemData();
+
+		// 获取控制器（因为组件挂在 Controller 上）
+		APlayerController* PC = Cast<APlayerController>(OwnerActor);
+		if (PC)
+		{
+			APawn* ControlledPawn = PC->GetPawn();
+			if (ControlledPawn)
+			{
+				UComp_Inventory* Inventory = ControlledPawn->FindComponentByClass<UComp_Inventory>();
+				if (Inventory)
+				{
+					// 销毁前先添加物品到背包
+					Inventory->AddItem(ItemData, 1);
+					UE_LOG(LogTemp, Log, TEXT("物品 %s 已添加到背包"), *ItemData.ItemName);
+				}
+				else
+				{
+					UE_LOG(LogTemp, Warning, TEXT("未找到背包组件"));
+				}
+			}
+		}
+
+		Item->Destroy();
+		UE_LOG(LogTemp, Log, TEXT("物品 %s 已在服务器销毁"), *Item->GetName());
 	}
 }

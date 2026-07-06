@@ -7,6 +7,7 @@
 #include "AbilitySystemComponent.h"
 #include "Core/G_PlayerState.h"
 #include "GameplayEffect.h"
+#include "Component/Comp_Inventory.h"
 #include "Engine/Engine.h"
 #include "GAS/AS_Player.h"
 #include "Net/UnrealNetwork.h"
@@ -14,24 +15,30 @@
 
 AG_Character::AG_Character()
 {
+	bReplicates = true;
 	PrimaryActorTick.bCanEverTick = true;
 	
+	// 玩家角色移动设置
 	GetCharacterMovement()->bOrientRotationToMovement = true;
 	GetCharacterMovement()->RotationRate = FRotator(0.f, 400.f, 0.f);
 	GetCharacterMovement()->bConstrainToPlane = true;
 	GetCharacterMovement()->bSnapToPlaneAtStart = true;
 	
+	// 禁用控制器旋转
 	bUseControllerRotationPitch = false;
 	bUseControllerRotationYaw = false;
 	bUseControllerRotationRoll = false;
 	
+	// 设置弹簧臂组件
 	SpringArmComp = CreateDefaultSubobject<USpringArmComponent>(TEXT("SpringArmComp"));
 	SpringArmComp->SetupAttachment(RootComponent);
 	SpringArmComp->TargetArmLength = 300.f;
 	SpringArmComp->bUsePawnControlRotation = true;
 	
+	// 设置相机组件
 	CameraComp = CreateDefaultSubobject<UCameraComponent>(TEXT("CameraComp"));
 	CameraComp->SetupAttachment(SpringArmComp);
+
 
 }
 
