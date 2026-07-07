@@ -8,6 +8,7 @@
 #include "Engine/LocalPlayer.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "Component/Comp_Interaction.h"   // 引入交互组件
+#include "Component/Comp_Inventory.h"
 
 AG_PlayerController::AG_PlayerController()
 {
@@ -187,4 +188,31 @@ void AG_PlayerController::OnLeftClick()
 void AG_PlayerController::OpenInventory_Implementation()
 {
 	
+}
+
+void AG_PlayerController::RequestMoveItem(int32 SourceIndex, int32 TargetIndex)
+{
+	if (HasAuthority())
+	{
+		// 如果已经是服务器，直接执行
+		ServerMoveItem(SourceIndex, TargetIndex);
+	}
+	else
+	{
+		// 客户端调用 RPC
+		ServerMoveItem(SourceIndex, TargetIndex);
+	}
+}
+
+void AG_PlayerController::ServerMoveItem_Implementation(int32 SourceIndex, int32 TargetIndex)
+{
+	if (APawn* MyPawn = GetPawn())
+	{
+		// 获取角色的背包组件
+		if (UComp_Inventory* Comp_Inventory = MyPawn->FindComponentByClass<UComp_Inventory>())
+		{
+			// 执行背包组件的移动项目函数
+			Comp_Inventory->MoveItem(SourceIndex, TargetIndex);
+		}
+	}
 }

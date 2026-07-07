@@ -87,6 +87,11 @@ private:
 protected:
 	UFUNCTION(BlueprintNativeEvent, Category = "Inventory", DisplayName = "打开/关闭背包")
 	void OpenInventory();							// 打开背包
+	
+	// 保存背包UI（WBP_Inventory（蓝图））
+	UPROPERTY(BlueprintReadOnly, Category = "UI")
+	TObjectPtr<UUserWidget> InventoryWidget;
+	
 private:
 	/* ------------------------------ 状态变量 ------------------------------ */
 	bool bFreeLook = true;                        // true=自由视角, false=俯视角锁定
@@ -100,4 +105,15 @@ private:
 
 	/* ------------------------------ 辅助函数 ------------------------------ */
 	// 从鼠标位置发射射线检测交互物（已弃用，改由组件处理）
+	
+public:
+	// 客户端调用，请求移动背包物品
+	UFUNCTION(BlueprintCallable, Category = "Inventory")
+	void RequestMoveItem(int32 SourceIndex, int32 TargetIndex);
+
+protected:
+	// 服务器执行的实际移动
+	UFUNCTION(Server, Reliable, BlueprintCallable)
+	void ServerMoveItem(int32 SourceIndex, int32 TargetIndex);
+	
 };

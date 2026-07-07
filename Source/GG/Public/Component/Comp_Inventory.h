@@ -71,13 +71,6 @@ public:
     // -------- 新增：为 TileView 提供数据对象数组 --------
     UFUNCTION(BlueprintCallable, Category = "Inventory")
     TArray<UInventorySlotData*> GetSlotDataObjects();
-
-    // // -------- 旧版UI刷新（已废弃，保留仅用于兼容，建议不再使用）--------
-    // UFUNCTION(BlueprintCallable, Category = "Inventory", meta = (DeprecatedFunction))
-    // void RefreshSlotsUI(UWrapBox* Container, TSubclassOf<UUserWidget> SlotWidgetClass);
-    //
-    // UFUNCTION(BlueprintImplementableEvent, Category = "Inventory", meta = (DeprecatedFunction))
-    // void SetSlotDataForWidget(UUserWidget* Widget, const FInventorySlot& SlotData);
     
     // 创建背包更新委托
     UPROPERTY(BlueprintAssignable, Category = "Inventory")
@@ -87,6 +80,10 @@ public:
     UFUNCTION(BlueprintCallable, Category = "Inventory")
     void BroadcastInventoryUpdated();
 
+    // 在服务器上执行物品移动（合并/交换），返回是否成功
+    UFUNCTION(BlueprintCallable, Category = "Inventory")
+    bool MoveItem(int32 SourceIndex, int32 TargetIndex);
+    
 protected:
     virtual void BeginPlay() override;
 

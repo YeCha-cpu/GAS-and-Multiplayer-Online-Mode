@@ -185,14 +185,17 @@ int32 UComp_Inventory::GetItemTotalQuantity(FName ItemID) const
 TArray<UInventorySlotData*> UComp_Inventory::GetSlotDataObjects()
 {
     TArray<UInventorySlotData*> Result;
+    
+    // 遍历所有槽位（包括空槽）
     for (int32 i = 0; i < Slots.Num(); ++i)
     {
-        if (Slots[i].IsEmpty()) continue;
+        // 不再跳过空槽，所有槽都创建数据
         UInventorySlotData* Data = NewObject<UInventorySlotData>(this);
-        Data->SlotData = Slots[i];
+        Data->SlotData = Slots[i];  // 空槽的 SlotData 就是默认空值（Quantity=0, ItemData=空）
         Data->SlotIndex = i;
         Result.Add(Data);
     }
+    
     return Result;
 }
 
@@ -202,26 +205,57 @@ void UComp_Inventory::BroadcastInventoryUpdated()
     UE_LOG(LogTemp, Log, TEXT("广播背包更新事件"));
 }
 
-// // ---------- 旧版 UI 刷新（保留但不再使用）---------
-// void UComp_Inventory::RefreshSlotsUI(UWrapBox* Container, TSubclassOf<UUserWidget> SlotWidgetClass)
-// {
-//     if (!Container || !SlotWidgetClass)
-//     {
-//         UE_LOG(LogTemp, Warning, TEXT("RefreshSlotsUI: 容器或槽位类无效"));
-//         return;
-//     }
-//
-//     Container->ClearChildren();
-//
-//     for (int32 i = 0; i < Slots.Num(); ++i)
-//     {
-//         const FInventorySlot& Slot = Slots[i];
-//         if (Slot.IsEmpty()) continue;
-//
-//         UUserWidget* SlotWidget = CreateWidget<UUserWidget>(GetWorld(), SlotWidgetClass);
-//         if (!SlotWidget) continue;
-//
-//         SetSlotDataForWidget(SlotWidget, Slot);
-//         Container->AddChild(SlotWidget);
-//     }
-// }
+bool UComp_Inventory::MoveItem(int32 SourceIndex, int32 TargetIndex)
+{
+    // 必须在服务器执行
+    if (!GetOwner()->HasAuthority()) return false;
+
+    // 边界检查
+    if (!Slots.IsValidIndex(SourceIndex) || !Slots.IsValidIndex(TargetIndex)) return false;
+    if (SourceIndex == TargetIndex) return true; // 相同槽位，无操作
+
+    FInventorySlot& SourceSlot = Slots[SourceIndex];
+    FInventorySlot& TargetSlot = Slots[TargetIndex];
+
+    // 若源槽为空，无操作
+    if (SourceSlot.IsEmpty()) return false;
+
+    // ---- 情况1：目标为空 - 直接移动 ----
+    if (TargetSlot.IsEmpty())
+    {
+        TargetSlot = SourceSlot;
+        SourceSlot = FInventorySlot();
+        OnRep_Slots(); // 触发更新
+        return true;
+    }
+
+    // ---- 情况2：目标非空 - 检查是否可堆叠 ----
+    if (SourceSlot.CanStackWith(TargetSlot.ItemData))
+    {
+        // 计算可容纳的数量
+        int32 MaxStack = SourceSlot.ItemData.ItemMaxStack; // 两者一样
+        int32 Space = MaxStack - TargetSlot.Quantity;
+        if (Space > 0)
+        {
+            int32 MoveAmount = FMath::Min(SourceSlot.Quantity, Space);
+            TargetSlot.Quantity += MoveAmount;
+            SourceSlot.Quantity -= MoveAmount;
+            if (SourceSlot.Quantity == 0)
+            {
+                SourceSlot = FInventorySlot();
+            }
+            OnRep_Slots();
+            return true;
+        }
+        else
+        {
+            // 目标已满，无法合并 → 执行交换（视为不同物品）
+            // 继续到交换逻辑
+        }
+    }
+
+    // ---- 情况3：不同物品或无法堆叠 → 交换 ----
+    Swap(SourceSlot, TargetSlot);
+    OnRep_Slots();
+    return true;
+}
