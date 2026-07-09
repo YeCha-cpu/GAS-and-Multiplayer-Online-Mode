@@ -9,111 +9,94 @@
 #include "G_PlayerController.generated.h"
 
 class UComp_Interaction;
+class UCharacterUIWidget;
 
-/**
- * 
- */
 UCLASS()
 class GG_API AG_PlayerController : public APlayerController
 {
-	GENERATED_BODY()
-	
+    GENERATED_BODY()
+
 public:
-	AG_PlayerController();
-	virtual void Tick(float DeltaTime) override;
-	
-	UPROPERTY(EditAnywhere, Category = "G|Movement")
-	float RunSpeed = 800.0f;
-	UPROPERTY(EditAnywhere, Category = "G|Movement")
-	float WalkSpeed = 600.0f;
-	
+    AG_PlayerController();
+    virtual void Tick(float DeltaTime) override;
+
+    // 角色 UI 类（需要在蓝图中设置）
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "UI")
+    TSubclassOf<UCharacterUIWidget> CharacterUIClass;
+
+    // 当前 UI 实例
+    UPROPERTY(BlueprintReadOnly, Category = "UI")
+    UCharacterUIWidget* CharacterUIWidget;
+
 protected:
-	virtual void BeginPlay() override;
-	virtual void SetupInputComponent() override;
-	
-	// 是否已打开背包
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "G|Inventory", DisplayName = "是否已打开背包")
-	bool bIsOpenInventory = false;
-	
+    virtual void BeginPlay() override;
+    virtual void SetupInputComponent() override;
+    virtual void OnPossess(APawn* InPawn) override;
+    virtual void OnRep_PlayerState() override;
+
+    // ========== 输入动作（与蓝图中配置的 IMC 匹配） ==========
+    UPROPERTY(EditAnywhere, Category = "G|Input")
+    TObjectPtr<UInputMappingContext> IMC;
+
+    UPROPERTY(EditAnywhere, Category = "G|Input")
+    TObjectPtr<UInputAction> MoveAction;
+    UPROPERTY(EditAnywhere, Category = "G|Input")
+    TObjectPtr<UInputAction> LookAction;
+    UPROPERTY(EditAnywhere, Category = "G|Input")
+    TObjectPtr<UInputAction> ZoomAction;
+    UPROPERTY(EditAnywhere, Category = "G|Input")
+    TObjectPtr<UInputAction> JumpAction;
+    UPROPERTY(EditAnywhere, Category = "G|Input")
+    TObjectPtr<UInputAction> RunAction;
+    UPROPERTY(EditAnywhere, Category = "G|Input")
+    TObjectPtr<UInputAction> EquipAction;
+    UPROPERTY(EditAnywhere, Category = "G|Input")
+    TObjectPtr<UInputAction> InteractAction;
+    UPROPERTY(EditAnywhere, Category = "G|Input")
+    TObjectPtr<UInputAction> AttackAction;
+    UPROPERTY(EditAnywhere, Category = "G|Input")
+    TObjectPtr<UInputAction> ToggleViewAction;
+    UPROPERTY(EditAnywhere, Category = "G|Input")
+    TObjectPtr<UInputAction> LeftClickAction;
+    UPROPERTY(EditAnywhere, Category = "G|Input")
+    TObjectPtr<UInputAction> OpenInventoryAction;
+
+    // ========== 输入回调函数 ==========
+    void MoveInput(const FInputActionValue& InputActionValue);
+    void LookInput(const FInputActionValue& InputActionValue);
+    void ZoomInput(const FInputActionValue& InputActionValue);
+    void JumpInput();
+    void EquipInput();
+    void InteractInput();
+    void AttackInput();
+    void ToggleViewMode();
+    void OnLeftClick();
+    UFUNCTION(BlueprintNativeEvent, Category = "Inventory")
+    void OpenInventory();
+
+    // 背包移动（RPC）
+    UFUNCTION(BlueprintCallable, Category = "Inventory")
+    void RequestMoveItem(int32 SourceIndex, int32 TargetIndex);
+    UFUNCTION(Server, Reliable, BlueprintCallable)
+    void ServerMoveItem(int32 SourceIndex, int32 TargetIndex);
+
+    // ========== 暴露给蓝图的背包开关变量 ==========
+    UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "G|Inventory", meta = (DisplayName = "是否已打开背包"))
+    bool bIsOpenInventory = false;
+
 private:
-	/* ------------------------------ IMC ------------------------------ */
-	UPROPERTY(EditAnywhere, Category = "G|Input")
-	TObjectPtr<UInputMappingContext> IMC;
-	
-	/* ------------------------------ 输入动作 ------------------------------ */
-	UPROPERTY(EditAnywhere, Category = "G|Input")
-	TObjectPtr<UInputAction> MoveAction;
-	
-	UPROPERTY(EditAnywhere, Category = "G|Input")
-	TObjectPtr<UInputAction> LookAction;
-	
-	UPROPERTY(EditAnywhere, Category = "G|Input")
-	TObjectPtr<UInputAction> ZoomAction;
-	
-	UPROPERTY(EditAnywhere, Category = "G|Input")
-	TObjectPtr<UInputAction> JumpAction;
-	
-	UPROPERTY(EditAnywhere, Category = "G|Input")
-	TObjectPtr<UInputAction> RunAction;
-	
-	UPROPERTY(EditAnywhere, Category = "G|Input")
-	TObjectPtr<UInputAction> EquipAction;
-	
-	UPROPERTY(EditAnywhere, Category = "G|Input")
-	TObjectPtr<UInputAction> InteractAction;
-	
-	UPROPERTY(EditAnywhere, Category = "G|Input")
-	TObjectPtr<UInputAction> AttackAction;
-	
-	UPROPERTY(EditAnywhere, Category = "G|Input")
-	TObjectPtr<UInputAction> ToggleViewAction;     // Q 键切换视角
+    // 创建并绑定 UI（内部）
+    void CreateAndBindUI();
 
-	UPROPERTY(EditAnywhere, Category = "G|Input")
-	TObjectPtr<UInputAction> LeftClickAction;      // 鼠标左键点击（俯视角下交互）
-	
-	UPROPERTY(EditAnywhere, Category = "G|Input")
-	TObjectPtr<UInputAction> OpenInventoryAction;  // Tab打开背包
+    // 视角模式状态
+    bool bFreeLook = true;
+    FRotator SavedSpringArmRotation;
 
-	/* ------------------------------ 输入回调函数 ------------------------------ */
-	void MoveInput(const FInputActionValue& InputActionValue);
-	void LookInput(const FInputActionValue& InputActionValue);
-	void ZoomInput(const FInputActionValue& InputActionValue);
-	void JumpInput();
-	void EquipInput();
-	void InteractInput();
-	void AttackInput();
-	void ToggleViewMode();                         // 切换视角模式
-	void OnLeftClick();                            // 鼠标左键点击（执行射线检测）
-protected:
-	UFUNCTION(BlueprintNativeEvent, Category = "Inventory", DisplayName = "打开/关闭背包")
-	void OpenInventory();							// 打开背包
-	
-	// 保存背包UI（WBP_Inventory（蓝图））
-	UPROPERTY(BlueprintReadOnly, Category = "UI")
-	TObjectPtr<UUserWidget> InventoryWidget;
-	
-private:
-	/* ------------------------------ 状态变量 ------------------------------ */
-	bool bFreeLook = true;                        // true=自由视角, false=俯视角锁定
+    // 交互组件
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Interaction", meta = (AllowPrivateAccess = "true"))
+    UComp_Interaction* InteractionComp;
 
-	// 保存自由视角下的弹簧臂旋转（用于恢复）
-	FRotator SavedSpringArmRotation;
-
-	/* ------------------------------ 交互组件 ------------------------------ */
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Interaction", meta = (AllowPrivateAccess = "true"))
-	UComp_Interaction* InteractionComp;
-
-	/* ------------------------------ 辅助函数 ------------------------------ */
-	// 从鼠标位置发射射线检测交互物（已弃用，改由组件处理）
-	
-public:
-	// 客户端调用，请求移动背包物品
-	UFUNCTION(BlueprintCallable, Category = "Inventory")
-	void RequestMoveItem(int32 SourceIndex, int32 TargetIndex);
-
-protected:
-	// 服务器执行的实际移动
-	UFUNCTION(Server, Reliable, BlueprintCallable)
-	void ServerMoveItem(int32 SourceIndex, int32 TargetIndex);
-	
+    // 背包 UI 引用
+    UPROPERTY(BlueprintReadOnly, Category = "UI", meta = (AllowPrivateAccess = "true"))
+    TObjectPtr<UUserWidget> InventoryWidget;
 };

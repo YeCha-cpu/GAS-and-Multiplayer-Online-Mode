@@ -68,7 +68,7 @@ public:
     UFUNCTION(BlueprintCallable, Category = "Inventory")
     int32 GetItemTotalQuantity(FName ItemID) const;
 
-    // -------- 新增：为 TileView 提供数据对象数组 --------
+    // -------- 为 TileView 提供数据对象数组 --------
     UFUNCTION(BlueprintCallable, Category = "Inventory")
     TArray<UInventorySlotData*> GetSlotDataObjects();
     
@@ -83,7 +83,11 @@ public:
     // 在服务器上执行物品移动（合并/交换），返回是否成功
     UFUNCTION(BlueprintCallable, Category = "Inventory")
     bool MoveItem(int32 SourceIndex, int32 TargetIndex);
-    
+
+    // ========== 新增：装备物品 ==========
+    UFUNCTION(BlueprintCallable, Category = "Inventory")
+    void EquipItem(int32 SlotIndex);
+
 protected:
     virtual void BeginPlay() override;
 
@@ -91,7 +95,6 @@ protected:
     UPROPERTY(ReplicatedUsing = OnRep_Slots)
     TArray<FInventorySlot> Slots;
 
-    // 
     UFUNCTION()
     void OnRep_Slots();
 
@@ -106,8 +109,15 @@ protected:
     // 生成掉落物品
     void SpawnDroppedItem(const FItemData& ItemData, int32 Quantity);
     
-    // 应用物品效果
+    // 应用物品效果（BlueprintNativeEvent，可在蓝图中重写）
+    UFUNCTION(BlueprintNativeEvent, Category = "Inventory")
     void ApplyItemEffect(const FItemData& ItemData);
+    // 默认实现声明（必须提供）
+    virtual void ApplyItemEffect_Implementation(const FItemData& ItemData);
+
+    // ========== 新增：服务器装备 RPC ==========
+    UFUNCTION(Server, Reliable, WithValidation)
+    void ServerEquipItem(int32 SlotIndex);
 
 public:
     virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;

@@ -6,7 +6,14 @@
 #include "GameFramework/PlayerController.h"
 #include "Engine/World.h"
 #include "Kismet/GameplayStatics.h"
-#include "Component/InventorySlotData.h"   // 新增包含
+#include "Component/InventorySlotData.h"
+#include "AbilitySystemComponent.h"
+#include "GameplayEffect.h"
+#include "GameFramework/Character.h"
+#include "Core/G_PlayerState.h"
+#include "GAS/AS_Player.h"
+#include "GameplayTagContainer.h"
+#include "Character/G_Character.h"
 
 UComp_Inventory::UComp_Inventory()
 {
@@ -27,12 +34,9 @@ void UComp_Inventory::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutL
     DOREPLIFETIME_CONDITION_NOTIFY(UComp_Inventory, Slots, COND_None, REPNOTIFY_Always);
 }
 
-// 背包数据更新时的回调
 void UComp_Inventory::OnRep_Slots()
 {
     UE_LOG(LogTemp, Log, TEXT("背包数据已更新"));
-    
-    // 新方式：广播委托
     BroadcastInventoryUpdated();
 }
 
@@ -42,10 +46,8 @@ bool UComp_Inventory::AddItem(const FItemData& ItemData, int32 Quantity)
     if (!GetOwner()->HasAuthority()) return false;
     if (Quantity <= 0 || ItemData.ID.IsNone()) return false;
 
-    // 当前要添加物品的剩余数量
     int32 Remaining = Quantity;
 
-    // 尝试堆叠物品
     if (ItemData.bCanStack)
     {
         for (int32 i = 0; i < Slots.Num(); ++i)
@@ -66,7 +68,6 @@ bool UComp_Inventory::AddItem(const FItemData& ItemData, int32 Quantity)
         }
     }
 
-    // 如果仍有剩余数量，则尝试放入空槽
     if (Remaining > 0)
     {
         for (int32 i = 0; i < Slots.Num(); ++i)
@@ -80,7 +81,6 @@ bool UComp_Inventory::AddItem(const FItemData& ItemData, int32 Quantity)
         }
     }
 
-    // 如果还有剩余数量，则说明背包已满无法添加
     if (Remaining > 0)
     {
         UE_LOG(LogTemp, Warning, TEXT("背包空间不足，剩余 %d 个未放入"), Remaining);
@@ -154,7 +154,6 @@ void UComp_Inventory::ServerDropItem_Implementation(int32 SlotIndex, int32 DropQ
     const FInventorySlot& Slot = Slots[SlotIndex];
     if (DropQuantity > Slot.Quantity) DropQuantity = Slot.Quantity;
 
-    // 生成掉落物品
     SpawnDroppedItem(Slot.ItemData, DropQuantity);
     RemoveItem(SlotIndex, DropQuantity);
 }
@@ -165,11 +164,35 @@ void UComp_Inventory::SpawnDroppedItem(const FItemData& ItemData, int32 Quantity
     // 实际生成逻辑可由蓝图或 C++ 扩展
 }
 
-void UComp_Inventory::ApplyItemEffect(const FItemData& ItemData)
+// ---------- ApplyItemEffect 默认实现 ----------
+void UComp_Inventory::ApplyItemEffect_Implementation(const FItemData& ItemData)
 {
-    UE_LOG(LogTemp, Log, TEXT("使用物品 %s，恢复值 %f"), *ItemData.ItemName, ItemData.ItemUseValue);
+    AG_Character* G_Character = Cast<AG_Character>(GetOwner());
+    if (!G_Character)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("ApplyItemEffect: 无法获取拥有者角色"));
+        return;
+    }
+
+    UClass* ItemClass = ItemData.ItemClass;
+    if (!ItemClass)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("ApplyItemEffect: ItemData 中没有指定 ItemClass"));
+        return;
+    }
+
+    AG_Items* DefaultItem = Cast<AG_Items>(ItemClass->GetDefaultObject());
+    if (!DefaultItem)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("ApplyItemEffect: %s 不是 AG_Items 的子类"), *ItemClass->GetName());
+        return;
+    }
+
+    DefaultItem->OnUsed(G_Character, ItemData);
+    UE_LOG(LogTemp, Log, TEXT("ApplyItemEffect: 已通知物品 %s 使用"), *ItemData.ItemName);
 }
 
+// ---------- 其他功能 ----------
 int32 UComp_Inventory::GetItemTotalQuantity(FName ItemID) const
 {
     int32 Total = 0;
@@ -181,21 +204,16 @@ int32 UComp_Inventory::GetItemTotalQuantity(FName ItemID) const
     return Total;
 }
 
-// ---------- 新增：为 TileView 提供数据对象 ----------
 TArray<UInventorySlotData*> UComp_Inventory::GetSlotDataObjects()
 {
     TArray<UInventorySlotData*> Result;
-    
-    // 遍历所有槽位（包括空槽）
     for (int32 i = 0; i < Slots.Num(); ++i)
     {
-        // 不再跳过空槽，所有槽都创建数据
         UInventorySlotData* Data = NewObject<UInventorySlotData>(this);
-        Data->SlotData = Slots[i];  // 空槽的 SlotData 就是默认空值（Quantity=0, ItemData=空）
+        Data->SlotData = Slots[i];
         Data->SlotIndex = i;
         Result.Add(Data);
     }
-    
     return Result;
 }
 
@@ -207,33 +225,26 @@ void UComp_Inventory::BroadcastInventoryUpdated()
 
 bool UComp_Inventory::MoveItem(int32 SourceIndex, int32 TargetIndex)
 {
-    // 必须在服务器执行
     if (!GetOwner()->HasAuthority()) return false;
-
-    // 边界检查
     if (!Slots.IsValidIndex(SourceIndex) || !Slots.IsValidIndex(TargetIndex)) return false;
-    if (SourceIndex == TargetIndex) return true; // 相同槽位，无操作
+    if (SourceIndex == TargetIndex) return true;
 
     FInventorySlot& SourceSlot = Slots[SourceIndex];
     FInventorySlot& TargetSlot = Slots[TargetIndex];
 
-    // 若源槽为空，无操作
     if (SourceSlot.IsEmpty()) return false;
 
-    // ---- 情况1：目标为空 - 直接移动 ----
     if (TargetSlot.IsEmpty())
     {
         TargetSlot = SourceSlot;
         SourceSlot = FInventorySlot();
-        OnRep_Slots(); // 触发更新
+        OnRep_Slots();
         return true;
     }
 
-    // ---- 情况2：目标非空 - 检查是否可堆叠 ----
     if (SourceSlot.CanStackWith(TargetSlot.ItemData))
     {
-        // 计算可容纳的数量
-        int32 MaxStack = SourceSlot.ItemData.ItemMaxStack; // 两者一样
+        int32 MaxStack = SourceSlot.ItemData.ItemMaxStack;
         int32 Space = MaxStack - TargetSlot.Quantity;
         if (Space > 0)
         {
@@ -247,15 +258,83 @@ bool UComp_Inventory::MoveItem(int32 SourceIndex, int32 TargetIndex)
             OnRep_Slots();
             return true;
         }
-        else
-        {
-            // 目标已满，无法合并 → 执行交换（视为不同物品）
-            // 继续到交换逻辑
-        }
     }
 
-    // ---- 情况3：不同物品或无法堆叠 → 交换 ----
     Swap(SourceSlot, TargetSlot);
     OnRep_Slots();
     return true;
+}
+
+// ========== 新增：装备物品 ==========
+
+void UComp_Inventory::EquipItem(int32 SlotIndex)
+{
+    if (!Slots.IsValidIndex(SlotIndex) || Slots[SlotIndex].IsEmpty())
+    {
+        UE_LOG(LogTemp, Warning, TEXT("EquipItem: 无效槽位或为空"));
+        return;
+    }
+
+    if (!GetOwner()->HasAuthority())
+    {
+        ServerEquipItem(SlotIndex);
+        return;
+    }
+    ServerEquipItem_Implementation(SlotIndex);
+}
+
+bool UComp_Inventory::ServerEquipItem_Validate(int32 SlotIndex)
+{
+    return Slots.IsValidIndex(SlotIndex);
+}
+
+void UComp_Inventory::ServerEquipItem_Implementation(int32 SlotIndex)
+{
+    if (!GetOwner()->HasAuthority()) return;
+
+    UE_LOG(LogTemp, Warning, TEXT("[Server] ServerEquipItem called, SlotIndex=%d, Slots.Num()=%d"), SlotIndex, Slots.Num());
+
+    if (!Slots.IsValidIndex(SlotIndex))
+    {
+        UE_LOG(LogTemp, Error, TEXT("[Server] Invalid SlotIndex!"));
+        return;
+    }
+
+    const FInventorySlot& Slot = Slots[SlotIndex];
+    if (Slot.IsEmpty())
+    {
+        UE_LOG(LogTemp, Error, TEXT("[Server] Slot is EMPTY!"));
+        return;
+    }
+
+    UE_LOG(LogTemp, Warning, TEXT("[Server] Slot has ItemName: %s, bCanEquip: %d, ItemClass: %s"),
+        *Slot.ItemData.ItemName,
+        Slot.ItemData.bCanEquip,
+        Slot.ItemData.ItemClass ? *Slot.ItemData.ItemClass->GetName() : TEXT("NULL"));
+
+    if (!Slot.ItemData.bCanEquip)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[Server] Item cannot be equipped (bCanEquip false)"));
+        return;
+    }
+
+    AG_Character* Character = Cast<AG_Character>(GetOwner());
+    if (!Character)
+    {
+        UE_LOG(LogTemp, Error, TEXT("[Server] Owner is not AG_Character"));
+        return;
+    }
+
+    // 先拷贝 ItemData，因为 RemoveItem 会修改槽位并可能清空数据导致传递数据失败
+    FItemData ItemDataCopy = Slot.ItemData;
+
+    // 从背包移除一个该物品
+    if (!RemoveItem(SlotIndex, 1))
+    {
+        UE_LOG(LogTemp, Error, TEXT("[Server] Failed to remove item from inventory"));
+        return;
+    }
+
+    // 使用拷贝的数据调用角色装备函数
+    Character->EquipWeapon(ItemDataCopy);
 }

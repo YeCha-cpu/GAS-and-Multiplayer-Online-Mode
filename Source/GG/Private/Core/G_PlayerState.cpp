@@ -3,6 +3,7 @@
 #include "Core/G_PlayerState.h"
 #include "AbilitySystemComponent.h"
 #include "AttributeSet.h"
+#include "GAS/AS_Player.h"   // 包含完整头文件以创建 UAS_Player
 
 AG_PlayerState::AG_PlayerState()
 {
@@ -13,8 +14,8 @@ AG_PlayerState::AG_PlayerState()
 	AbilitySystemComponent->SetIsReplicated(true);// 确保与网络同步
 	AbilitySystemComponent->SetReplicationMode(EGameplayEffectReplicationMode::Mixed);// 设置 玩家ASC 的复制模式为 Mixed，主要针对GE
 	
-	// 创建属性集
-	AttributeSet = CreateDefaultSubobject<UAttributeSet>("Attributes");
+	// 创建属性集（类型改为 UAS_Player）
+	AttributeSet = CreateDefaultSubobject<UAS_Player>("Attributes");
 }
 
 UAbilitySystemComponent* AG_PlayerState::GetAbilitySystemComponent() const

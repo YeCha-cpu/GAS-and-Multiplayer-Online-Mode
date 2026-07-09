@@ -13,6 +13,7 @@ class UGameplayAbility;
 class UAbilitySystemComponent;
 class UCameraComponent;
 class USpringArmComponent;
+class AG_Items;
 
 UCLASS()
 class GG_API AG_Character : public ACharacter
@@ -46,14 +47,46 @@ public:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "GAS|Effects")
 	TSubclassOf<UGameplayEffect> DefaultInitialEffect;
-	
+
+	// ========== 新增：战斗/装备相关 ==========
+	// 装备武器
+	UFUNCTION(BlueprintCallable, Category = "Combat")
+	void EquipWeapon(const FItemData& ItemData);
+
+	// 卸下武器（可被蓝图调用）
+	UFUNCTION(BlueprintCallable, Category = "Combat")
+	void UnequipWeapon();
+
+	// 当前装备的武器（网络复制）
+	UPROPERTY(ReplicatedUsing = OnRep_EquippedWeapon, BlueprintReadOnly, Category = "Combat")
+	AG_Items* EquippedWeapon;
+
+	// 是否为战斗姿态（射击姿态）
+	UPROPERTY(ReplicatedUsing = OnRep_IsCombatMode, BlueprintReadOnly, Category = "Combat")
+	bool bIsCombatMode = false;
+
+	// 武器挂载点 Socket 名称（可在蓝图编辑）
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat")
+	FName WeaponSocketName = "weapon_socket";
+
+	// 姿态变化时蓝图事件（可选）
+	UFUNCTION(BlueprintImplementableEvent, Category = "Combat")
+	void OnCombatModeChanged(bool bNewMode);
+
 protected:
 	virtual void InitAbilityActorInfo();
 	
 	UFUNCTION(BlueprintCallable, Category = "GAS")
 	void InitializeGAS();
 
-private:	
+private:
+	// 内部卸下（清除武器Actor，不处理背包归还）
+	void InternalUnequipWeapon();
 
+	// RepNotify 回调
+	UFUNCTION()
+	void OnRep_EquippedWeapon();
 
+	UFUNCTION()
+	void OnRep_IsCombatMode();
 };
