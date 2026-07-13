@@ -10,7 +10,7 @@
 UAS_Player::UAS_Player()
 {
 	// 初始化属性值
-	InitHealth(50.f);
+	InitHealth(100.f);
 	InitMaxHealth(100.f);
 	InitDefense(5.f);
 	InitMaxDefense(100.f);

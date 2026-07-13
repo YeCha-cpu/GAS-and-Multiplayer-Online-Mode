@@ -132,13 +132,6 @@ void UComp_Interaction::ApplyHighlight(AG_Items* Item)
 	}
 }
 
-// ---------- 服务器 RPC 实现 ----------
-
-// 验证函数，确保调用者有权限执行 RPC
-bool UComp_Interaction::ServerDestroyItem_Validate(AG_Items* Item)
-{
-	return IsValid(Item);
-}
 // RPC 实现，执行物品销毁
 void UComp_Interaction::ServerDestroyItem_Implementation(AG_Items* Item)
 {

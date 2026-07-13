@@ -64,6 +64,9 @@ class GG_API AG_Items : public AActor
 public:	
 	AG_Items();
 	virtual void Tick(float DeltaTime) override;
+	
+	// 获取物品网格组件方法
+	USkeletalMeshComponent* GetItemMesh() const { return ItemMesh; }
 
 	// 获取物品数据
 	UFUNCTION(BlueprintCallable, Category = "Item")

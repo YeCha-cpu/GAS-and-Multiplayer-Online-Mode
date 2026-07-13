@@ -60,6 +60,8 @@ protected:
     TObjectPtr<UInputAction> LeftClickAction;
     UPROPERTY(EditAnywhere, Category = "G|Input")
     TObjectPtr<UInputAction> OpenInventoryAction;
+    UPROPERTY(EditAnywhere, Category = "G|Input")
+    TObjectPtr<UInputAction> ShootModeAction;
 
     // ========== 输入回调函数 ==========
     void MoveInput(const FInputActionValue& InputActionValue);
@@ -73,6 +75,8 @@ protected:
     void OnLeftClick();
     UFUNCTION(BlueprintNativeEvent, Category = "Inventory")
     void OpenInventory();
+    void StartShootMode();
+    void EndShootMode();
 
     // 背包移动（RPC）
     UFUNCTION(BlueprintCallable, Category = "Inventory")

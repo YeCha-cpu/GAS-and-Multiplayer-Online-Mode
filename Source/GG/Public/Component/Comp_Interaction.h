@@ -61,6 +61,6 @@ protected:
 	void OnItemPickedUp(AG_Items* PickedItem);
 
 	// 服务器 RPC：用于在服务器上销毁物品
-	UFUNCTION(Server, Reliable, WithValidation)
+	UFUNCTION(Server, Reliable)
 	void ServerDestroyItem(AG_Items* Item);
 };

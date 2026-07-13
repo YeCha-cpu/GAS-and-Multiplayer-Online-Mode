@@ -84,8 +84,10 @@ void AG_PlayerController::SetupInputComponent()
     EnhancedInputComponent->BindAction(InteractAction, ETriggerEvent::Started, this, &AG_PlayerController::InteractInput);
     EnhancedInputComponent->BindAction(AttackAction, ETriggerEvent::Started, this, &AG_PlayerController::AttackInput);
     EnhancedInputComponent->BindAction(ToggleViewAction, ETriggerEvent::Started, this, &AG_PlayerController::ToggleViewMode);
-    EnhancedInputComponent->BindAction(LeftClickAction, ETriggerEvent::Started, this, &AG_PlayerController::OnLeftClick);
+    EnhancedInputComponent->BindAction(LeftClickAction, ETriggerEvent::Triggered, this, &AG_PlayerController::OnLeftClick);
     EnhancedInputComponent->BindAction(OpenInventoryAction, ETriggerEvent::Started, this, &AG_PlayerController::OpenInventory);
+    EnhancedInputComponent->BindAction(ShootModeAction, ETriggerEvent::Started, this, &AG_PlayerController::StartShootMode);
+    EnhancedInputComponent->BindAction(ShootModeAction, ETriggerEvent::Completed, this, &AG_PlayerController::EndShootMode);
 }
 
 void AG_PlayerController::MoveInput(const FInputActionValue& InputActionValue)
@@ -191,8 +193,44 @@ void AG_PlayerController::ToggleViewMode()
     }
 }
 
+void AG_PlayerController::StartShootMode()
+{
+    if (AG_Character* Char = Cast<AG_Character>(GetPawn()))
+    {
+        Char->SetShootingMode(true);
+    }
+}
+
+void AG_PlayerController::EndShootMode()
+{
+    if (AG_Character* Char = Cast<AG_Character>(GetPawn()))
+    {
+        Char->SetShootingMode(false);
+    }
+}
+
+// ★ 修改：增加详细日志
 void AG_PlayerController::OnLeftClick()
 {
+    AG_Character* Char = Cast<AG_Character>(GetPawn());
+    if (!Char)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("OnLeftClick: 无法获取角色"));
+        return;
+    }
+
+    // 打印当前射击模式状态
+    UE_LOG(LogTemp, Warning, TEXT("OnLeftClick: bIsShootingMode = %d"), Char->bIsShootingMode);
+
+    // 如果处于射击模式，执行开火
+    if (Char->bIsShootingMode)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("OnLeftClick: 调用 FireWeapon"));
+        Char->FireWeapon();
+        return;
+    }
+
+    // 否则执行原有的交互逻辑（俯视角拾取）
     if (bFreeLook)
         return;
 
