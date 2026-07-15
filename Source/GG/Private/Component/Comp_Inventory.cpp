@@ -34,10 +34,18 @@ void UComp_Inventory::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutL
     DOREPLIFETIME_CONDITION_NOTIFY(UComp_Inventory, Slots, COND_None, REPNOTIFY_Always);
 }
 
+// ---------- 背包更新 ----------
 void UComp_Inventory::OnRep_Slots()
 {
-    UE_LOG(LogTemp, Log, TEXT("背包数据已更新"));
     BroadcastInventoryUpdated();
+    // 如果是本地角色，刷新武器UI
+    if (AG_Character* Char = Cast<AG_Character>(GetOwner()))
+    {
+        if (Char->IsLocallyControlled())
+        {
+            Char->UpdateWeaponUI();
+        }
+    }
 }
 
 // ---------- 添加物品 ----------
@@ -192,7 +200,7 @@ void UComp_Inventory::ApplyItemEffect_Implementation(const FItemData& ItemData)
     UE_LOG(LogTemp, Log, TEXT("ApplyItemEffect: 已通知物品 %s 使用"), *ItemData.ItemName);
 }
 
-// ---------- 其他功能 ----------
+// ---------- 获取改ID类物品总数 ----------
 int32 UComp_Inventory::GetItemTotalQuantity(FName ItemID) const
 {
     int32 Total = 0;
@@ -204,6 +212,7 @@ int32 UComp_Inventory::GetItemTotalQuantity(FName ItemID) const
     return Total;
 }
 
+// ---------- 获取槽位数据对象 ----------
 TArray<UInventorySlotData*> UComp_Inventory::GetSlotDataObjects()
 {
     TArray<UInventorySlotData*> Result;
@@ -217,12 +226,14 @@ TArray<UInventorySlotData*> UComp_Inventory::GetSlotDataObjects()
     return Result;
 }
 
+// ---------- 广播背包更新事件 ----------
 void UComp_Inventory::BroadcastInventoryUpdated()
 {
     OnInventoryUpdatedDelegate.Broadcast();
-    UE_LOG(LogTemp, Log, TEXT("广播背包更新事件"));
+    //UE_LOG(LogTemp, Log, TEXT("广播背包更新事件"));
 }
 
+// ---------- 移动物品 ----------
 bool UComp_Inventory::MoveItem(int32 SourceIndex, int32 TargetIndex)
 {
     if (!GetOwner()->HasAuthority()) return false;
@@ -265,7 +276,7 @@ bool UComp_Inventory::MoveItem(int32 SourceIndex, int32 TargetIndex)
     return true;
 }
 
-// ========== 新增：装备物品 ==========
+// ========== 装备物品 ==========
 
 void UComp_Inventory::EquipItem(int32 SlotIndex)
 {
@@ -337,4 +348,56 @@ void UComp_Inventory::ServerEquipItem_Implementation(int32 SlotIndex)
 
     // 使用拷贝的数据调用角色装备函数
     Character->EquipWeapon(ItemDataCopy);
+}
+
+// 按ID查找第一个匹配的槽位（用于移除时快速定位，实际移除时需要多次查找）
+int32 UComp_Inventory::FindSlotByID(FName ItemID) const
+{
+    for (int32 i = 0; i < Slots.Num(); ++i)
+    {
+        if (!Slots[i].IsEmpty() && Slots[i].ItemData.ID == ItemID)
+            return i;
+    }
+    return INDEX_NONE;
+}
+
+// 按ID移除指定数量（尽量从多个槽位扣除）
+bool UComp_Inventory::RemoveItemByID(FName ItemID, int32 Quantity)
+{
+    if (!GetOwner()->HasAuthority()) return false;
+    if (Quantity <= 0 || ItemID.IsNone()) return false;
+
+    int32 Remaining = Quantity;
+    // 从前往后遍历，依次扣除
+    for (int32 i = 0; i < Slots.Num() && Remaining > 0; ++i)
+    {
+        FInventorySlot& Slot = Slots[i];
+        if (Slot.IsEmpty() || Slot.ItemData.ID != ItemID)
+            continue;
+
+        int32 Available = Slot.Quantity;
+        int32 Take = FMath::Min(Remaining, Available);
+        Slot.Quantity -= Take;
+        Remaining -= Take;
+
+        // 如果该槽位清空，置空
+        if (Slot.Quantity == 0)
+        {
+            Slot = FInventorySlot();
+        }
+    }
+
+    // 如果完全扣除成功，触发更新
+    if (Remaining == 0)
+    {
+        OnRep_Slots();
+        return true;
+    }
+    else
+    {
+        // 部分扣除或未扣除，但已经修改了部分槽位，仍需要广播（因为客户端需要同步）
+        OnRep_Slots();
+        UE_LOG(LogTemp, Warning, TEXT("RemoveItemByID: 背包中物品 %s 数量不足，仅移除 %d 个"), *ItemID.ToString(), Quantity - Remaining);
+        return false; // 未能完全移除所需数量
+    }
 }

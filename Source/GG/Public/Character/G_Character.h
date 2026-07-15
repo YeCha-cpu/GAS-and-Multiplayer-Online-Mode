@@ -15,6 +15,7 @@ class UAbilitySystemComponent;
 class UCameraComponent;
 class USpringArmComponent;
 class AG_Items;
+class AG_Weapons;   // 新增前置声明
 
 UCLASS()
 class GG_API AG_Character : public ACharacter
@@ -155,4 +156,31 @@ private:
 
 	// 计算瞄准方向（客户端调用）
 	FVector CalculateFireDirection() const;
+
+	// ========== 新增：射速和瞄准同步 ==========
+	// 上次开火时间（用于射速限制）
+	float LastFireTime = 0.0f;
+
+	// 当前瞄准俯仰角（网络复制，供其他玩家看到瞄准方向）
+	UPROPERTY(ReplicatedUsing = OnRep_AimPitch, BlueprintReadWrite, Category = "Combat", meta = (AllowPrivateAccess = "true"))   // ★ 修改：添加 OnRep
+	float AimPitch = 0.0f;
+
+public:
+	// 获取 AimPitch 的蓝图访问
+	UFUNCTION(BlueprintPure, Category = "Combat")
+	float GetAimPitch() const { return AimPitch; }
+
+	// 更新瞄准角度（由客户端 Tick 调用）
+	void UpdateAimPitch();
+
+	// ★ 新增：服务器 RPC 用于更新 AimPitch（由客户端调用）
+	UFUNCTION(Server, Reliable, WithValidation)
+	void ServerSetAimPitch(float NewAimPitch);
+
+	// ★ 新增：当 AimPitch 被复制时触发的回调
+	UFUNCTION()
+	void OnRep_AimPitch();
+	
+	// 更新武器相关的 UI（弹药、图标等）
+	void UpdateWeaponUI();
 };

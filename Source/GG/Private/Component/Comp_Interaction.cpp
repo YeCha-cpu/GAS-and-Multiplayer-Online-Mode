@@ -2,12 +2,16 @@
 
 #include "Component/Comp_Interaction.h"
 
+#include "Character/G_Character.h"
 #include "Component/Comp_Inventory.h"
 #include "Item/G_Items.h"
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/Pawn.h"
 #include "Engine/World.h"
 #include "Net/UnrealNetwork.h"
+#include "Item/Ammo/G_AmmunitionBox.h"
+#include "Item/Medicines/G_Medicines.h"
+#include "Item/Weapon/G_Weapons.h"
 
 UComp_Interaction::UComp_Interaction()
 {
@@ -109,7 +113,11 @@ AG_Items* UComp_Interaction::TraceForInteractable() const
 
 	if (HitResult.bBlockingHit)
 	{
-		return Cast<AG_Items>(HitResult.GetActor());
+		AActor* HitActor = HitResult.GetActor();
+		if (HitActor)
+		{
+			return Cast<AG_Items>(HitActor);
+		}
 	}
 	return nullptr;
 }
@@ -132,37 +140,42 @@ void UComp_Interaction::ApplyHighlight(AG_Items* Item)
 	}
 }
 
-// RPC 实现，执行物品销毁
+// 服务器端实现，销毁物品
+// Comp_Interaction.cpp
 void UComp_Interaction::ServerDestroyItem_Implementation(AG_Items* Item)
 {
 	AActor* OwnerActor = GetOwner();
-	if (OwnerActor && OwnerActor->HasAuthority() && IsValid(Item))
+	if (!OwnerActor || !OwnerActor->HasAuthority() || !IsValid(Item))
+		return;
+
+	APlayerController* PC = Cast<APlayerController>(OwnerActor);
+	if (!PC) return;
+	APawn* ControlledPawn = PC->GetPawn();
+	if (!ControlledPawn) return;
+	AG_Character* Char = Cast<AG_Character>(ControlledPawn);
+	if (!Char) return;
+
+	FItemData ItemData = Item->GetItemData();
+	UComp_Inventory* Inventory = Char->FindComponentByClass<UComp_Inventory>();
+
+	if (Inventory)
 	{
-		// 获取物品数据
-		FItemData ItemData = Item->GetItemData();
-
-		// 获取控制器（因为组件挂在 Controller 上）
-		APlayerController* PC = Cast<APlayerController>(OwnerActor);
-		if (PC)
+		// 尝试将物品添加到背包（数量为1）
+		bool bAdded = Inventory->AddItem(ItemData, 1);
+		if (bAdded)
 		{
-			APawn* ControlledPawn = PC->GetPawn();
-			if (ControlledPawn)
-			{
-				UComp_Inventory* Inventory = ControlledPawn->FindComponentByClass<UComp_Inventory>();
-				if (Inventory)
-				{
-					// 销毁前先添加物品到背包
-					Inventory->AddItem(ItemData, 1);
-					UE_LOG(LogTemp, Log, TEXT("物品 %s 已添加到背包"), *ItemData.ItemName);
-				}
-				else
-				{
-					UE_LOG(LogTemp, Warning, TEXT("未找到背包组件"));
-				}
-			}
+			UE_LOG(LogTemp, Log, TEXT("物品 %s 已添加到背包"), *ItemData.ItemName);
+			Item->Destroy(); // 拾取物销毁
 		}
-
+		else
+		{
+			UE_LOG(LogTemp, Warning, TEXT("物品 %s 添加背包失败（背包已满），保留物品"), *ItemData.ItemName);
+			// 保留物品，不销毁（可由玩家稍后再次拾取）
+		}
+	}
+	else
+	{
+		// 没有背包组件，直接销毁（安全措施）
 		Item->Destroy();
-		UE_LOG(LogTemp, Log, TEXT("物品 %s 已在服务器销毁"), *Item->GetName());
 	}
 }

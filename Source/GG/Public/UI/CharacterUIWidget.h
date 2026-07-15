@@ -25,6 +25,10 @@ public:
     // 属性绑定：获取 ASC（由子类或实例化时设置）
     UFUNCTION(BlueprintCallable, Category = "UI|GAS")
     void BindToAbilitySystem(UAbilitySystemComponent* InASC);
+    
+    // 更新武器信息（蓝图可重写）
+    UFUNCTION(BlueprintImplementableEvent, Category = "UI|Weapon")
+    void UpdateWeaponInfo(const FItemData& WeaponData, int32 CurrentAmmo, int32 MaxAmmo);
 
 protected:
     // 当前绑定的 ASC（弱引用，避免循环依赖）

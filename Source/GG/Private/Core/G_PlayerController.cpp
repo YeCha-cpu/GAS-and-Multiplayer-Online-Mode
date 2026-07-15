@@ -12,6 +12,8 @@
 #include "Core/G_PlayerState.h"          // 新增：用于获取 ASC
 #include "UI/CharacterUIWidget.h"        // 新增：用于 UI 类
 #include "AbilitySystemComponent.h"      // 新增：用于 ASC 操作
+#include "TimerManager.h"
+#include "Item/Weapon/G_Weapons.h"       // ★ 新增：用于访问武器换弹逻辑
 
 AG_PlayerController::AG_PlayerController()
 {
@@ -88,6 +90,7 @@ void AG_PlayerController::SetupInputComponent()
     EnhancedInputComponent->BindAction(OpenInventoryAction, ETriggerEvent::Started, this, &AG_PlayerController::OpenInventory);
     EnhancedInputComponent->BindAction(ShootModeAction, ETriggerEvent::Started, this, &AG_PlayerController::StartShootMode);
     EnhancedInputComponent->BindAction(ShootModeAction, ETriggerEvent::Completed, this, &AG_PlayerController::EndShootMode);
+    EnhancedInputComponent->BindAction(ReloadAction, ETriggerEvent::Started, this, &AG_PlayerController::ReloadInput);
 }
 
 void AG_PlayerController::MoveInput(const FInputActionValue& InputActionValue)
@@ -317,4 +320,34 @@ void AG_PlayerController::CreateAndBindUI()
     {
         UE_LOG(LogTemp, Warning, TEXT("CreateAndBindUI: ASC 无效，绑定失败"));
     }
+}
+
+// 新增：换弹输入处理
+void AG_PlayerController::ReloadInput()
+{
+    AG_Character* Char = Cast<AG_Character>(GetPawn());
+    if (!Char)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("ReloadInput: 无法获取角色"));
+        return;
+    }
+
+    // 获取当前装备的武器
+    AG_Items* EquippedWeapon = Char->EquippedWeapon;
+    if (!EquippedWeapon)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("ReloadInput: 未装备武器"));
+        return;
+    }
+
+    // 尝试转换为 AG_Weapons
+    AG_Weapons* Weapon = Cast<AG_Weapons>(EquippedWeapon);
+    if (!Weapon)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("ReloadInput: 当前装备不是武器（AG_Weapons 类型）"));
+        return;
+    }
+
+    // 调用换弹函数（内部自动处理客户端→服务器的RPC）
+    Weapon->Reload();
 }

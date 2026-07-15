@@ -18,6 +18,7 @@ class GG_API AG_PlayerController : public APlayerController
 
 public:
     AG_PlayerController();
+
     virtual void Tick(float DeltaTime) override;
 
     // 角色 UI 类（需要在蓝图中设置）
@@ -62,6 +63,8 @@ protected:
     TObjectPtr<UInputAction> OpenInventoryAction;
     UPROPERTY(EditAnywhere, Category = "G|Input")
     TObjectPtr<UInputAction> ShootModeAction;
+    UPROPERTY(EditAnywhere, Category = "G|Input")
+    TObjectPtr<UInputAction> ReloadAction;
 
     // ========== 输入回调函数 ==========
     void MoveInput(const FInputActionValue& InputActionValue);
@@ -77,6 +80,7 @@ protected:
     void OpenInventory();
     void StartShootMode();
     void EndShootMode();
+    void ReloadInput();
 
     // 背包移动（RPC）
     UFUNCTION(BlueprintCallable, Category = "Inventory")

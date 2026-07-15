@@ -121,4 +121,12 @@ protected:
 
 public:
     virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+    
+    // 按物品ID移除指定数量（从多个槽位依次扣除），返回是否成功移除全部
+    UFUNCTION(BlueprintCallable, Category = "Inventory")
+    bool RemoveItemByID(FName ItemID, int32 Quantity);
+
+protected:
+    // 辅助函数：查找第一个包含指定物品ID的槽位索引（用于减少遍历）
+    int32 FindSlotByID(FName ItemID) const;
 };

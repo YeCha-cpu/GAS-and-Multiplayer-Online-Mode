@@ -14,4 +14,6 @@ class GG_API AG_Medicines : public AG_Items
 {
 	GENERATED_BODY()
 	
+public:
+	virtual void OnUsed_Implementation(APawn* User, const FItemData& InItemData) override;
 };
